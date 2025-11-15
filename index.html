@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>File Sorter: Categorized Drag and Drop</title>
+    <style>
+        /* --- 1. General Setup --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f4f8;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            overflow: hidden;
+        }
+
+        /* --- 2. Game Container --- */
+        #game-container {
+            width: 600px;
+            height: 700px;
+            background-color: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            position: relative;
+            overflow: hidden;
+            touch-action: none; 
+        }
+
+        #game-area {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: linear-gradient(to bottom, #d6eaff, #ffffff 70%);
+        }
+
+        /* --- 3. UI Elements --- */
+        #score-board {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
+            z-index: 10;
+        }
+        
+        /* Lives Display */
+        #lives-display {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 24px;
+            font-weight: 600;
+            color: #e74c3c;
+            z-index: 10;
+        }
+
+        #instructions {
+            position: absolute;
+            bottom: 10px;
+            width: 100%;
+            text-align: center;
+            font-size: 14px;
+            color: #7f8c8d;
+            z-index: 10;
+        }
+        
+        /* Message Popups */
+        .message-popup {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(44, 62, 80, 0.85);
+            display: none; 
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            z-index: 100;
+            text-align: center;
+        }
+
+        .message-popup h2 { font-size: 42px; margin: 0; }
+        .message-popup p { font-size: 20px; margin: 10px 0 25px 0; }
+        #start-button, #restart-button {
+            font-size: 20px; padding: 12px 25px; border: none; border-radius: 8px;
+            background-color: #2ecc71; color: white; font-weight: 600; cursor: pointer;
+            transition: background-color 0.2s;
+        }
+        #start-button:hover, #restart-button:hover { background-color: #27ae60; }
+
+
+        /* --- 5. Game Objects: Files --- */
+        .file {
+            position: absolute;
+            width: 70px; 
+            height: 40px;
+            padding: 5px;
+            line-height: 40px;
+            text-align: center;
+            background-color: #f7f9fc;
+            border: 2px solid #333;
+            border-radius: 6px;
+            font-weight: bold;
+            font-size: 16px;
+            user-select: none;
+            cursor: grab;
+            transition: border-color 0.1s;
+        }
+        .file:active {
+            cursor: grabbing;
+        }
+
+        /* File Type Colors based on category */
+        .file[data-category="document"] { background-color: #e6f3ff; border-color: #3498db; color: #3498db; }
+        .file[data-category="image"] { background-color: #e8fff1; border-color: #2ecc71; color: #2ecc71; }
+        .file[data-category="video"] { background-color: #ffe6e6; border-color: #e74c3c; color: #e74c3c; }
+
+
+        /* --- 6. Game Objects: Boxes --- */
+        .box-container {
+            position: absolute;
+            bottom: 50px;
+            width: 100%;
+            display: flex;
+            justify-content: space-around;
+        }
+        
+        .box {
+            width: 150px;
+            height: 100px;
+            border: 5px solid #bdc3c7;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: 700;
+            background-color: #ecf0f1;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        
+        /* Specific box styles */
+        #box-document { color: #3498db; border-color: #3498db; }
+        #box-image { color: #2ecc71; border-color: #2ecc71; }
+        #box-video { color: #e74c3c; border-color: #e74c3c; }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+        
+        <div id="game-area">
+            
+            <div class="box-container">
+                <div class="box" id="box-image" data-category="image">🖼️ Image Files</div>
+                <div class="box" id="box-video" data-category="video">🎥 Video Files</div>
+                <div class="box" id="box-document" data-category="document">📄 Documents</div>
+            </div>
+
+        </div>
+
+        <div id="score-board">
+            Score: <span id="score-value">0</span> | Wave: <span id="wave-value">1</span>
+        </div>
+        <div id="lives-display">
+            Lives: <span id="lives-value">5</span>
+        </div>
+        <p id="instructions">
+            Drag the file extensions to the correct *Category Box* before they hit the bottom!
+        </p>
+
+        <div class="message-popup" id="wave-message" style="display: none;">
+            <h2>Wave Cleared!</h2>
+            <p>Prepare for the next one...</p>
+        </div>
+
+        <div class="message-popup" id="start-screen" style="display: flex;">
+            <h2>File Sorter Challenge</h2>
+            <p>Drag the falling files to the matching category box (Documents, Images, or Videos)! You have 5 lives.</p>
+            <button id="start-button">Start Game</button>
+        </div>
+
+        <div class="message-popup" id="end-screen" style="display: none;">
+            <h2 id="end-title">Game Over!</h2>
+            <p id="end-score">Final Score: 0</p>
+            <button id="restart-button">Play Again</button>
+        </div>
+
+    </div>
+
+    <script>
+        window.addEventListener('load', () => {
+
+            // --- 1. Get DOM Elements ---
+            const gameArea = document.getElementById('game-area');
+            const scoreValue = document.getElementById('score-value');
+            const waveValue = document.getElementById('wave-value');
+            const livesValue = document.getElementById('lives-value'); // New: Lives Display
+
+            // Boxes (Targets)
+            const boxDoc = document.getElementById('box-document');
+            const boxPic = document.getElementById('box-image');
+            const boxVid = document.getElementById('box-video');
+            const boxes = [boxDoc, boxPic, boxVid];
+
+            // Screens & Buttons
+            const startScreen = document.getElementById('start-screen');
+            const endScreen = document.getElementById('end-screen');
+            const waveMessage = document.getElementById('wave-message');
+            const startButton = document.getElementById('start-button');
+            const restartButton = document.getElementById('restart-button');
+            const endTitle = document.getElementById('end-title');
+            const endScore = document.getElementById('end-score');
+
+            // --- 2. Game State Variables ---
+            let score = 0;
+            let lives = 0; // New: Lives variable
+            let wave = 1;
+            let filesInWave = 0;
+            let filesSpawned = 0;
+            let filesCaught = 0;
+            let currentSpeed = 0;
+            let spawnInterval = 0;
+
+            let activeFiles = []; 
+            let gameLoopId = null;
+            let spawnTimer = null;
+            let gameActive = false;
+            let gameWidth;
+            
+            // Drag and Drop Variables
+            let draggedFile = null;
+            let mouseOffsetX = 0;
+            let mouseOffsetY = 0;
+
+            // Game config
+            const WAVE_CONFIG = [
+                { files: 10, speed: 1.5, interval: 1800 }, 
+                { files: 12, speed: 2, interval: 1600 },   
+                { files: 15, speed: 2.5, interval: 1400 }, 
+                { files: 18, speed: 3, interval: 1200 },   
+                { files: 25, speed: 3.5, interval: 1000 } 
+            ];
+
+            // File Types and Categories
+            const FILE_TYPES = [
+                { type: '.PDF', category: 'document' },
+                { type: '.TXT', category: 'document' },
+                { type: '.PPT', category: 'document' },
+                
+                { type: '.JPG', category: 'image' },
+                { type: '.PNG', category: 'image' },
+                { type: '.GIF', category: 'image' },
+
+                { type: '.MP4', category: 'video' },
+                { type: '.FLV', category: 'video' },
+                { type: '.MOV', category: 'video' }
+            ];
+
+            // --- 3. Event Listeners ---
+            startButton.addEventListener('click', startGame);
+            restartButton.addEventListener('click', startGame);
+
+            // --- 4. Core Game Logic ---
+
+            function startGame() {
+                gameWidth = gameArea.clientWidth; 
+                
+                score = 0;
+                lives = 5; // New: Initialize lives
+                wave = 1;
+                activeFiles = [];
+                gameActive = true;
+                
+                startScreen.style.display = 'none';
+                endScreen.style.display = 'none';
+                waveMessage.style.display = 'none';
+
+                gameArea.querySelectorAll('.file').forEach(file => file.remove());
+                stopGameLoop();
+
+                setupWave();
+                startGameLoop();
+            }
+
+            function setupWave() {
+                const config = WAVE_CONFIG[wave - 1];
+                filesInWave = config.files;
+                currentSpeed = config.speed;
+                spawnInterval = config.interval;
+                
+                filesSpawned = 0;
+                filesCaught = 0;
+
+                updateUI();
+            }
+
+            function startGameLoop() {
+                if (gameLoopId) cancelAnimationFrame(gameLoopId); 
+                if (spawnTimer) clearInterval(spawnTimer); 
+                
+                gameLoopId = requestAnimationFrame(gameLoop);
+                spawnTimer = setInterval(spawnFile, spawnInterval);
+            }
+
+            function stopGameLoop() {
+                if (gameLoopId) cancelAnimationFrame(gameLoopId);
+                if (spawnTimer) clearInterval(spawnTimer);
+                gameLoopId = null;
+                spawnTimer = null;
+            }
+
+            function gameLoop() {
+                if (!gameActive) return;
+
+                for (let i = activeFiles.length - 1; i >= 0; i--) {
+                    const file = activeFiles[i];
+                    
+                    if (file === draggedFile) continue; 
+                    
+                    // 1. Move file
+                    let top = parseFloat(file.style.top);
+                    file.style.top = (top + currentSpeed) + 'px';
+
+                    const fileRect = file.getBoundingClientRect();
+                    const gameRect = gameArea.getBoundingClientRect();
+
+                    // 2. Check for miss (hit the bottom)
+                    if (fileRect.top > gameRect.bottom) {
+                        handleCatch(file, null); // Miss (null category)
+                        
+                        // Check for Game Over immediately after a miss
+                        if (lives <= 0) {
+                            endGame(false, "Game Over, you lose🫵🏽"); // New: Pass custom message
+                            return; // Stop the loop
+                        }
+                    }
+                }
+                gameLoopId = requestAnimationFrame(gameLoop);
+            }
+
+            function spawnFile() {
+                if (filesSpawned >= filesInWave) {
+                    clearInterval(spawnTimer); 
+                    spawnTimer = null;
+                    return;
+                }
+
+                filesSpawned++;
+                
+                const file = document.createElement('div');
+                const fileType = FILE_TYPES[Math.floor(Math.random() * FILE_TYPES.length)];
+                
+                file.className = 'file';
+                file.textContent = fileType.type;
+                file.dataset.category = fileType.category; 
+
+                // Add drag listeners
+                file.addEventListener('mousedown', startDrag);
+                file.addEventListener('touchstart', startDrag);
+
+                // Position it
+                const fileWidth = 80; 
+                const maxLeft = gameWidth - fileWidth; 
+                file.style.left = (Math.random() * maxLeft) + 'px';
+                file.style.top = '-50px'; 
+
+                gameArea.appendChild(file);
+                activeFiles.push(file);
+            }
+
+            // --- 5. Drag and Drop Logic ---
+
+            function startDrag(e) {
+                e.preventDefault();
+                if (!gameActive || draggedFile) return;
+
+                const file = e.currentTarget;
+                draggedFile = file;
+                draggedFile.style.zIndex = 20; 
+
+                const rect = draggedFile.getBoundingClientRect();
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+                mouseOffsetX = clientX - rect.left;
+                mouseOffsetY = clientY - rect.top;
+
+                document.addEventListener('mousemove', onDrag);
+                document.addEventListener('mouseup', endDrag);
+                document.addEventListener('touchmove', onDrag);
+                document.addEventListener('touchend', endDrag);
+            }
+
+            function onDrag(e) {
+                if (!draggedFile) return;
+
+                const clientX = e.clientX || e.touches[0].clientX;
+                const clientY = e.clientY || e.touches[0].clientY;
+
+                const gameRect = gameArea.getBoundingClientRect();
+                const fileWidth = draggedFile.clientWidth;
+                const fileHeight = draggedFile.clientHeight;
+
+                let newX = clientX - gameRect.left - mouseOffsetX;
+                let newY = clientY - gameRect.top - mouseOffsetY;
+
+                newX = Math.max(0, Math.min(newX, gameWidth - fileWidth));
+                newY = Math.max(0, Math.min(newY, gameArea.clientHeight - fileHeight));
+
+                draggedFile.style.left = newX + 'px';
+                draggedFile.style.top = newY + 'px';
+            }
+
+            function endDrag(e) {
+                if (!draggedFile) return;
+                
+                // Clean up handlers
+                document.removeEventListener('mousemove', onDrag);
+                document.removeEventListener('mouseup', endDrag);
+                document.removeEventListener('touchmove', onDrag);
+                document.removeEventListener('touchend', endDrag);
+
+                draggedFile.style.zIndex = 1; 
+
+                // Collision check against static boxes
+                const fileRect = draggedFile.getBoundingClientRect();
+                let droppedCategory = null;
+                
+                for (const box of boxes) {
+                    if (isColliding(fileRect, box.getBoundingClientRect())) {
+                        droppedCategory = box.dataset.category; 
+                        break;
+                    }
+                }
+
+                handleCatch(draggedFile, droppedCategory);
+                draggedFile = null;
+
+                // Check for Game Over immediately after a catch/miss
+                if (lives <= 0) {
+                    endGame(false, "Game Over, you lose🫵🏽");
+                }
+            }
+
+
+            // --- 6. Handlers and Helpers ---
+
+            function handleCatch(file, droppedCategory) {
+                filesCaught++;
+                
+                const fileCategory = file.dataset.category; 
+                
+                if (fileCategory === droppedCategory) {
+                    score += 10; 
+                } else {
+                    score -= 5;
+                    lives -= 1; // New: Lose a life for an incorrect drop or miss
+                }
+
+                removeFile(file);
+                updateUI();
+
+                // Check for wave end
+                if (filesCaught === filesInWave) {
+                    checkWaveEnd();
+                }
+            }
+
+            function checkWaveEnd() {
+                stopGameLoop(); 
+
+                if (wave === WAVE_CONFIG.length) {
+                    endGame(true, "You Win! All Waves Cleared!"); // Pass custom win message
+                } else {
+                    wave++;
+                    showWaveMessage();
+                }
+            }
+
+            function showWaveMessage() {
+                waveMessage.style.display = 'flex';
+                setTimeout(() => {
+                    waveMessage.style.display = 'none';
+                    setupWave();
+                    startGameLoop();
+                }, 3000); 
+            }
+
+            // Updated endGame function to handle lives and custom message
+            function endGame(didWin, message) {
+                gameActive = false;
+                stopGameLoop();
+
+                endTitle.textContent = message;
+                endScore.textContent = `Final Score: ${score}`;
+                endScreen.style.display = 'flex';
+            }
+
+            function isColliding(rect1, rect2) {
+                return !(
+                    rect1.right < rect2.left ||
+                    rect1.left > rect2.right ||
+                    rect1.bottom < rect2.top ||
+                    rect1.top > rect2.bottom
+                );
+            }
+
+            function removeFile(file) {
+                file.remove();
+                activeFiles = activeFiles.filter(f => f !== file);
+            }
+
+            function updateUI() {
+                scoreValue.textContent = score;
+                waveValue.textContent = wave;
+                livesValue.textContent = lives; // New: Update lives display
+            }
+        });
+    </script>
+</body>
+</html>
